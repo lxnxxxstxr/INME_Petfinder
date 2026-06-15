@@ -148,6 +148,5 @@ Entwickelt im Rahmen eines Hochschulprojekts.
 
 Technische Umsetzung: HTML · CSS · JavaScript · Supabase
 
-
-https://DEIN-GITHUB-USERNAME.github.io/DEIN-REPOSITORY-NAME
+https://lxnxxxstxr.github.io/INME_Petfinder/
 Weil jedes Tier die Chance verdient, geliebt zu werden. 🐾
