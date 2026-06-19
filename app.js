@@ -1,622 +1,690 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiermatcher – Finde dein perfektes Haustier</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
+/* ═══════════════════════════════════════════════
+   TIERMATCHER – APP.JS
+   Zweistufiges Empfehlungssystem:
+   1. Tierartklassifikation
+   2. Rassenranking via Supabase API
+═══════════════════════════════════════════════ */
 
-  <!-- ═══════════════════════════════════════
-       NAVBAR
-  ═══════════════════════════════════════ -->
-  <nav class="navbar" id="navbar">
-    <div class="nav-inner">
-      <a href="#hero" class="nav-logo">
-        <img src="assets/logo.png" alt="Tiermatcher – Finde dein perfektes Haustier" class="nav-logo-img" />
-      </a>
-      <ul class="nav-links">
-        <li><a href="#hero" class="nav-link active">Startseite</a></li>
-        <li><a href="#fakten" class="nav-link">Fakten</a></li>
-        <li><a href="#quiz-section" class="nav-link">Quiz</a></li>
-      </ul>
-      <button class="nav-burger" id="navBurger" aria-label="Menü öffnen">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-    <!-- Mobile Menu -->
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="#hero" class="mobile-link">Startseite</a>
-      <a href="#fakten" class="mobile-link">Fakten</a>
-      <a href="#quiz-section" class="mobile-link">Quiz</a>
-    </div>
-  </nav>
+/* ── Supabase Konfiguration ── */
+const SUPABASE_URL = 'https://fmkxzfplndztpqagojyj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__ZSVo2dDpjPMQsDAiCUwXw_xU7KeZL7';
+const TABLE_NAME   = 'tierprofile';
 
-  <!-- ═══════════════════════════════════════
-       HERO
-  ═══════════════════════════════════════ -->
-  <section class="hero" id="hero">
+/* ── App Namespace ── */
+const App = (() => {
 
-    <!-- Header Image - full width -->
-    <div class="hero-header-img-wrap">
-      <img
-        src="https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=1600&q=80"
-        alt="Hund und Katze zusammen"
-        class="hero-header-img"
-      />
-    </div>
+  /* ─── State ─── */
+  let currentStep = 0;
+  const TOTAL_STEPS = 16; // 0–15
+  const answers = {};
 
-    <!-- Content grid below image -->
-    <div class="hero-grid">
-      <div class="hero-content">
-        <span class="hero-eyebrow">Verantwortungsvolle Tiervermittlung</span>
-        <h1 class="hero-title">
-          Jedes Tier verdient<br />
-          <em>ein Zuhause voller Liebe.</em>
-        </h1>
-        <p class="hero-subtitle">
-          Tausende Tiere warten in deutschen Tierheimen auf eine zweite Chance.
-          <span class="highlight">Unser Quiz zeigt dir, welches Tier wirklich zu deinem Leben passt — für dich und das Tier.</span>
+  /* ─────────────────────────────────────────
+     QUIZ NAVIGATION
+  ───────────────────────────────────────── */
+  function nextStep() {
+    if (!validateStep(currentStep)) return;
+
+    const steps = document.querySelectorAll('.quiz-step[data-step]');
+    steps.forEach(s => s.classList.remove('active'));
+
+    currentStep++;
+    const nextEl = document.querySelector(`.quiz-step[data-step="${currentStep}"]`);
+    if (nextEl) {
+      nextEl.style.display = '';
+      nextEl.classList.add('active');
+    }
+
+    updateProgress();
+    window.scrollTo({ top: document.getElementById('quiz-section').offsetTop - 80, behavior: 'smooth' });
+  }
+
+  function prevStep() {
+    if (currentStep <= 0) return;
+    const steps = document.querySelectorAll('.quiz-step[data-step]');
+    steps.forEach(s => s.classList.remove('active'));
+    currentStep--;
+    const prevEl = document.querySelector(`.quiz-step[data-step="${currentStep}"]`);
+    if (prevEl) {
+      prevEl.style.display = '';
+      prevEl.classList.add('active');
+    }
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const percent = Math.round((currentStep / (TOTAL_STEPS - 1)) * 100);
+    const fill = document.getElementById('progressFill');
+    const label = document.getElementById('progressLabel');
+    const pct = document.getElementById('progressPercent');
+    if (fill)  fill.style.width = percent + '%';
+    if (pct)   pct.textContent = percent + '%';
+    if (label) {
+      const questionNum = Math.max(1, currentStep);
+      label.textContent = `Frage ${questionNum} von ${TOTAL_STEPS - 1}`;
+    }
+  }
+
+  function validateStep(step) {
+    if (step === 0) {
+      const plz = document.getElementById('inputPlz').value.trim();
+      if (!plz || !/^\d{5}$/.test(plz)) {
+        showInputError('inputPlz', 'Bitte gib eine gültige 5-stellige Postleitzahl ein.');
+        return false;
+      }
+      answers.plz = plz;
+      return true;
+    }
+
+    const stepEl = document.querySelector(`.quiz-step[data-step="${step}"]`);
+    if (!stepEl) return true;
+
+    const grid = stepEl.querySelector('.choice-grid');
+    if (!grid) return true;
+
+    const question = grid.dataset.question;
+    const selected = grid.querySelector('.choice-card.selected');
+
+    if (!selected) {
+      flashGrid(grid);
+      return false;
+    }
+
+    if (question === 'vorhandene_tiere' && selected.dataset.value === 'sonstiges') {
+      const text = document.getElementById('sonstigesText')?.value.trim() || '';
+      answers[question] = 'sonstiges:' + text;
+    } else {
+      answers[question] = selected.dataset.value;
+    }
+
+    return true;
+  }
+
+  function showInputError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.borderColor = '#e74c3c';
+    el.focus();
+    let hint = el.parentElement.querySelector('.error-hint');
+    if (!hint) {
+      hint = document.createElement('span');
+      hint.className = 'input-hint error-hint';
+      hint.style.color = '#e74c3c';
+      el.parentElement.appendChild(hint);
+    }
+    hint.textContent = msg;
+    setTimeout(() => { el.style.borderColor = ''; if(hint) hint.remove(); }, 3000);
+  }
+
+  function flashGrid(grid) {
+    grid.style.outline = '2px solid #e74c3c';
+    grid.style.borderRadius = '12px';
+    setTimeout(() => { grid.style.outline = ''; }, 1200);
+  }
+
+  /* ─────────────────────────────────────────
+     QUIZ SUBMIT
+  ───────────────────────────────────────── */
+  async function submitQuiz() {
+    if (!validateStep(currentStep)) return;
+
+    const steps = document.querySelectorAll('.quiz-step[data-step]');
+    steps.forEach(s => { s.classList.remove('active'); s.style.display = 'none'; });
+    const loading = document.querySelector('.quiz-loading');
+    if (loading) { loading.style.display = 'flex'; loading.style.flexDirection = 'column'; loading.style.alignItems = 'center'; }
+
+    try {
+      /* ── STUFE 1: Tierartklassifikation ── */
+      const tierartScores = berechneTierartScore(answers);
+      const empfohleneTierart = Object.entries(tierartScores)
+        .sort((a, b) => b[1] - a[1])[0][0];
+
+      const wunschtier = answers.wunschtier || 'offen';
+      const wunschWegAktiv = (wunschtier !== 'offen' && wunschtier !== 'unsicher' && wunschtier !== empfohleneTierart);
+
+      /* ── PLZ → Koordinaten via Nominatim ── */
+      const userCoords = await geocodePLZ(answers.plz);
+
+      /* ── STUFE 2: Supabase API → Tiere der empfohlenen Art ── */
+      const alleTiere = await fetchTiereByArt(empfohleneTierart);
+
+      const bewerteteTiere = alleTiere
+        .map(tier => {
+          const dist = userCoords
+            ? haversineKm(userCoords.lat, userCoords.lng, tier.tierheim_lat, tier.tierheim_lng)
+            : null;
+          const rasseScore = berechneRasseScore(tier, answers);
+          return { ...tier, distanzKm: dist, rasseScore };
+        })
+        .filter(t => !t.distanzKm || t.distanzKm <= 200)
+        .sort((a, b) => {
+          const scoreDiff = b.rasseScore - a.rasseScore;
+          if (Math.abs(scoreDiff) > 5) return scoreDiff;
+          return (a.distanzKm || 999) - (b.distanzKm || 999);
+        });
+
+      const top3 = bewerteteTiere.slice(0, 3);
+
+      let wunschtierResult = null;
+      if (wunschWegAktiv) {
+        const wunschTiere = await fetchTiereByArt(wunschtier);
+        const bewertetWunsch = wunschTiere
+          .map(tier => {
+            const dist = userCoords
+              ? haversineKm(userCoords.lat, userCoords.lng, tier.tierheim_lat, tier.tierheim_lng)
+              : null;
+            return { ...tier, distanzKm: dist, rasseScore: berechneRasseScore(tier, answers) };
+          })
+          .filter(t => !t.distanzKm || t.distanzKm <= 200)
+          .sort((a, b) => b.rasseScore - a.rasseScore);
+        wunschtierResult = bewertetWunsch[0] || null;
+      }
+
+      if (loading) loading.style.display = 'none';
+      zeigeErgebnis({ top3, tierartScores, empfohleneTierart, wunschtier, wunschWegAktiv, wunschtierResult });
+
+    } catch (err) {
+      console.error('Fehler beim Laden der Ergebnisse:', err);
+      if (loading) loading.style.display = 'none';
+      zeigeError();
+    }
+  }
+
+  /* ─────────────────────────────────────────
+     STUFE 1 – TIERARTKLASSIFIKATION
+  ───────────────────────────────────────── */
+  function berechneTierartScore(a) {
+    const scores = { hund: 0, katze: 0, kleintier: 0, vogel: 0, fisch: 0 };
+
+    /* F1 – Wohnsituation (Gewichtung 5)
+       Hinweis: Fisch, Vogel und Kleintier leben in Aquarium/Käfig/Gehege —
+       ob ein Garten vorhanden ist, ist für sie nicht entscheidend.
+       Nur Hund und Katze werden hier differenziert bewertet,
+       um eine künstliche Bevorzugung der "raumunabhängigen" Tiere zu vermeiden. */
+    const wohnMap = {
+      klein_ohne:         { hund:-2, katze:2, kleintier:0, vogel:0, fisch:0 },
+      wohnung_balkon:     { hund:1,  katze:3, kleintier:0, vogel:0, fisch:0 },
+      haus_garten:        { hund:3,  katze:2, kleintier:0, vogel:0, fisch:0 },
+      haus_grosser_garten:{ hund:3,  katze:2, kleintier:0, vogel:0, fisch:0 },
+    };
+    addWeighted(scores, wohnMap[a.wohnsituation], 5);
+
+    /* F2 – Haushalt (Gewichtung 3) */
+    const haushaltMap = {
+      allein:       { hund:2, katze:3, kleintier:2, vogel:2, fisch:2 },
+      partner:      { hund:3, katze:2, kleintier:2, vogel:2, fisch:2 },
+      kinder_klein: { hund:3, katze:1, kleintier:1, vogel:-1, fisch:1 },
+      kinder_gross: { hund:3, katze:2, kleintier:2, vogel:1,  fisch:1 },
+      wg:           { hund:1, katze:2, kleintier:2, vogel:1,  fisch:2 },
+    };
+    addWeighted(scores, haushaltMap[a.haushalt], 3);
+
+    /* F3 – Vorhandene Tiere (Gewichtung 4) */
+    const tierMap = {
+      keine:   { hund:2, katze:2, kleintier:2, vogel:2,  fisch:2  },
+      hund:    { hund:3, katze:1, kleintier:-1, vogel:-1, fisch:1  },
+      katze:   { hund:1, katze:3, kleintier:-2, vogel:-2, fisch:2  },
+      fische:  { hund:2, katze:2, kleintier:2,  vogel:1,  fisch:3  },
+      hamster: { hund:1, katze:-1, kleintier:3, vogel:1,  fisch:2  },
+      hase:    { hund:1, katze:-2, kleintier:2, vogel:1,  fisch:2  },
+      vogel:   { hund:1, katze:-1, kleintier:1, vogel:3,  fisch:2  },
+    };
+    const tierKey = a.vorhandene_tiere?.startsWith('sonstiges') ? null : a.vorhandene_tiere;
+    if (tierKey && tierMap[tierKey]) addWeighted(scores, tierMap[tierKey], 4);
+
+    /* F4 – Stunden weg (Gewichtung 5) */
+    const wegMap = {
+      unter4:       { hund:3,  katze:2, kleintier:2, vogel:3,  fisch:1 },
+      vier_acht:    { hund:1,  katze:3, kleintier:2, vogel:1,  fisch:2 },
+      ueber8:       { hund:-3, katze:2, kleintier:1, vogel:-1, fisch:3 },
+      unregelmaessig:{ hund:-1, katze:2, kleintier:2, vogel:-1, fisch:3 },
+    };
+    addWeighted(scores, wegMap[a.stunden_weg], 5);
+
+    /* F5 – Aktive Zeit (Gewichtung 4) */
+    const zeitMap = {
+      unter30:         { hund:-2, katze:1, kleintier:2, vogel:1, fisch:3 },
+      dreissig_sechzig:{ hund:1,  katze:3, kleintier:2, vogel:2, fisch:2 },
+      ein_drei:        { hund:3,  katze:2, kleintier:2, vogel:3, fisch:1 },
+      ueber3:          { hund:3,  katze:1, kleintier:1, vogel:2, fisch:1 },
+    };
+    addWeighted(scores, zeitMap[a.aktive_zeit], 4);
+
+    /* F6 – Reisen (Gewichtung 3) */
+    const reisenMap = {
+      kaum:      { hund:3,  katze:2, kleintier:2, vogel:3,  fisch:2 },
+      ein_zwei:  { hund:2,  katze:3, kleintier:2, vogel:1,  fisch:3 },
+      mehrmals:  { hund:-1, katze:2, kleintier:1, vogel:-1, fisch:3 },
+      sehr_oft:  { hund:-2, katze:1, kleintier:1, vogel:-2, fisch:2 },
+    };
+    addWeighted(scores, reisenMap[a.reisen], 3);
+
+    /* F7 – Aktivitätslevel (Gewichtung 4) */
+    const aktivMap = {
+      ruhig:   { hund:1, katze:3, kleintier:2, vogel:2, fisch:3 },
+      moderat: { hund:2, katze:2, kleintier:2, vogel:2, fisch:1 },
+      aktiv:   { hund:3, katze:1, kleintier:1, vogel:1, fisch:1 },
+      outdoor: { hund:3, katze:1, kleintier:1, vogel:1, fisch:0 },
+    };
+    addWeighted(scores, aktivMap[a.aktivitaet], 4);
+
+    /* F8 – Alltag (Gewichtung 5) */
+    const alltagMap = {
+      ruhig:    { hund:1,  katze:3, kleintier:2, vogel:1, fisch:3  },
+      spiel:    { hund:3,  katze:2, kleintier:3, vogel:3, fisch:-1 },
+      draussen: { hund:3,  katze:1, kleintier:1, vogel:0, fisch:0  },
+      training: { hund:3,  katze:1, kleintier:1, vogel:2, fisch:0  },
+    };
+    addWeighted(scores, alltagMap[a.alltag], 5);
+
+    /* F9 – Geräusche (Gewichtung 3) */
+    const geraeuschMap = {
+      kein_problem: { hund:3,  katze:2, kleintier:2, vogel:3,  fisch:1 },
+      etwas_ok:     { hund:2,  katze:2, kleintier:2, vogel:1,  fisch:2 },
+      viel_ruhe:    { hund:-2, katze:2, kleintier:1, vogel:-2, fisch:3 },
+      nachbarn:     { hund:-3, katze:2, kleintier:1, vogel:-3, fisch:3 },
+    };
+    addWeighted(scores, geraeuschMap[a.geraeusche], 3);
+
+    /* F10 – Erfahrung (Gewichtung 3) */
+    const erfahrungMap = {
+      keine:    { hund:-1, katze:1, kleintier:2, vogel:-1, fisch:3 },
+      kind:     { hund:1,  katze:2, kleintier:2, vogel:1,  fisch:2 },
+      etwas:    { hund:2,  katze:2, kleintier:2, vogel:2,  fisch:1 },
+      erfahren: { hund:3,  katze:3, kleintier:2, vogel:3,  fisch:1 },
+    };
+    addWeighted(scores, erfahrungMap[a.erfahrung], 3);
+
+    /* F11 – Kuscheln (Gewichtung 4) */
+    const kuschelMap = {
+      sehr_wichtig:{ hund:3,  katze:2, kleintier:1, vogel:1,  fisch:-2 },
+      schoen:      { hund:2,  katze:2, kleintier:2, vogel:2,  fisch:1  },
+      unwichtig:   { hund:1,  katze:1, kleintier:1, vogel:2,  fisch:3  },
+    };
+    addWeighted(scores, kuschelMap[a.kuscheln], 4);
+
+    /* F12 – Budget (Gewichtung 2) */
+    const budgetMap = {
+      unter50:      { hund:-3, katze:-1, kleintier:2, vogel:-1, fisch:3 },
+      fuenfzig_150: { hund:-1, katze:2,  kleintier:3, vogel:2,  fisch:3 },
+      ein50_300:    { hund:3,  katze:3,  kleintier:2, vogel:3,  fisch:2 },
+      kein_limit:   { hund:3,  katze:3,  kleintier:2, vogel:3,  fisch:2 },
+    };
+    addWeighted(scores, budgetMap[a.budget], 2);
+
+    /* F13 – Charakter (Gewichtung 4) */
+    const charakterMap = {
+      treue:         { hund:3, katze:1, kleintier:1, vogel:2, fisch:0 },
+      selbststaendig:{ hund:1, katze:3, kleintier:2, vogel:1, fisch:3 },
+      verspielt:     { hund:3, katze:2, kleintier:3, vogel:2, fisch:-1},
+      ruhe:          { hund:1, katze:3, kleintier:2, vogel:1, fisch:3 },
+    };
+    addWeighted(scores, charakterMap[a.charakter], 4);
+
+    /* Realitäts-Bonus
+       Hunde und Katzen sind in deutschen Tierheimen mit Abstand am häufigsten
+       vertreten (vgl. Statistiken auf der Startseite) und werden auch generell
+       häufiger nachgefragt. Ein kleiner Sockel-Bonus gleicht aus, dass die
+       Wohnsituations-Frage für Fisch/Vogel/Kleintier nun neutral bewertet wird,
+       und bildet die reale Verteilung realistischer ab — ohne die anderen
+       Tierarten bei klar passenden Antworten zu verdrängen. */
+    scores.hund  += 4;
+    scores.katze += 4;
+
+    /* F14 – Allergie (Gewichtung 5 – Ausschlusslogik) */
+    if (a.allergie === 'stark') {
+      scores.hund    = Math.min(scores.hund,    -50);
+      scores.katze   = Math.min(scores.katze,   -50);
+      scores.kleintier = Math.min(scores.kleintier, -30);
+    } else if (a.allergie === 'leicht') {
+      scores.hund  -= 10;
+      scores.katze -= 10;
+    }
+
+    return scores;
+  }
+
+  function addWeighted(scores, map, weight) {
+    if (!map) return;
+    for (const [art, val] of Object.entries(map)) {
+      if (scores[art] !== undefined) scores[art] += val * weight;
+    }
+  }
+
+  /* ─────────────────────────────────────────
+     STUFE 2 – RASSENRANKING
+  ───────────────────────────────────────── */
+  function berechneRasseScore(tier, a) {
+    let score = 0;
+
+    const platzmapping = { klein_ohne: 'klein', wohnung_balkon: 'mittel', haus_garten: 'gross', haus_grosser_garten: 'gross' };
+    const platz = platzmapping[a.wohnsituation] || 'mittel';
+    if (tier.platzbedarf === platz) score += 10;
+    else if (tier.platzbedarf === 'klein' && platz !== 'klein') score += 5;
+    else if (tier.platzbedarf === 'gross' && platz === 'klein') score -= 15;
+
+    const aktivmapping = { ruhig: 'niedrig', moderat: 'mittel', aktiv: 'hoch', outdoor: 'sehr_hoch' };
+    const nutzerAktiv = aktivmapping[a.aktivitaet] || 'mittel';
+    if (tier.aktivitaet === nutzerAktiv) score += 12;
+    else if (Math.abs(['niedrig','mittel','hoch','sehr_hoch'].indexOf(tier.aktivitaet) -
+             ['niedrig','mittel','hoch','sehr_hoch'].indexOf(nutzerAktiv)) === 1) score += 5;
+    else score -= 5;
+
+    if (a.erfahrung === 'keine' && tier.erfahrung_noetig === 'hoch') score -= 15;
+    if (a.erfahrung === 'erfahren' && tier.erfahrung_noetig === 'gering') score += 3;
+
+    if (a.allergie === 'leicht' && tier.allergierisiko === 'hoch') score -= 20;
+    if (a.allergie === 'stark' && tier.allergierisiko !== 'kein') score -= 50;
+
+    if (a.geraeusche === 'viel_ruhe' && tier.laerm_level === 'hoch') score -= 12;
+    if (a.geraeusche === 'nachbarn' && tier.laerm_level === 'hoch') score -= 20;
+    if (a.geraeusche === 'kein_problem' && tier.laerm_level === 'hoch') score += 5;
+
+    if (a.kuscheln === 'sehr_wichtig' && tier.kuschelfaktor === 'sehr_hoch') score += 10;
+    if (a.kuscheln === 'sehr_wichtig' && tier.kuschelfaktor === 'kein') score -= 10;
+    if (a.kuscheln === 'unwichtig' && tier.kuschelfaktor === 'sehr_hoch') score -= 3;
+
+    if (a.stunden_weg === 'ueber8' && tier.einzelhaltung === 'nein' && tier.art === 'hund') score -= 20;
+
+    return score;
+  }
+
+  /* ─────────────────────────────────────────
+     SUPABASE API
+  ───────────────────────────────────────── */
+  async function fetchTiereByArt(art) {
+    const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?art=eq.${encodeURIComponent(art)}&select=*`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    if (!res.ok) throw new Error(`Supabase Fehler: ${res.status}`);
+    return res.json();
+  }
+
+  /* ─────────────────────────────────────────
+     GEOCODING – PLZ → Koordinaten
+  ───────────────────────────────────────── */
+  async function geocodePLZ(plz) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?postalcode=${plz}&country=de&format=json&limit=1`;
+      const res = await fetch(url, {
+        headers: { 'Accept-Language': 'de', 'User-Agent': 'Tiermatcher/1.0' }
+      });
+      const data = await res.json();
+      if (data && data[0]) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+    } catch (e) {
+      console.warn('Geocoding fehlgeschlagen:', e);
+    }
+    return null;
+  }
+
+  /* ─────────────────────────────────────────
+     ENTFERNUNG – Haversine Formel
+  ───────────────────────────────────────── */
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+  }
+  function toRad(deg) { return deg * Math.PI / 180; }
+
+  /* ─────────────────────────────────────────
+     ERGEBNIS MODAL RENDERN
+  ───────────────────────────────────────── */
+  function zeigeErgebnis({ top3, tierartScores, empfohleneTierart, wunschtier, wunschWegAktiv, wunschtierResult }) {
+    const tierartLabel = {
+      hund: 'Hund', katze: 'Katze', kleintier: 'Kleintier', vogel: 'Vogel', fisch: 'Fisch'
+    };
+
+    let html = '';
+
+    /* ── Modal Header ── */
+    html += `
+      <div class="modal-header">
+        <div class="modal-eyebrow">Dein persönliches Ergebnis</div>
+        <h2 class="modal-title" id="modalTitle">
+          Dein Match: ${tierartLabel[empfohleneTierart]}
+        </h2>
+        <p class="modal-subtitle">
+          Basierend auf deinen Antworten passt ein
+          <strong>${tierartLabel[empfohleneTierart]}</strong> am besten zu deinem Lebensstil.
+          Hier sind die drei besten Matches aus Tierheimen in deiner Nähe:
         </p>
-        <p class="hero-subtitle">
-          Du erhältst direkt passende Tierprofile aus Tierheimen in deiner Nähe,
-          inklusive Fotos, Infos und Kontaktdaten. So kannst du sofort den
-          ersten Schritt Richtung Adoption machen.
-        </p>
-        <div class="hero-actions">
-          <a href="#quiz-section" class="btn-primary">Hier geht's zum Quiz</a>
-          <a href="#fakten" class="btn-ghost">Mehr erfahren</a>
-        </div>
-      </div>
+      </div>`;
 
-      <div class="hero-note">
-        <h3 class="hero-note-title">Ehrlichkeit ist die größte Form von Fürsorge.</h3>
-        <p class="hero-note-text">
-          Bitte nimm dir einen Moment Zeit und beantworte die Fragen so ehrlich
-          und gewissenhaft wie möglich. Es geht bei diesem Quiz nicht darum,
-          das „perfekte" Haustier zu finden. Viel wichtiger ist, herauszufinden,
-          welches Tier wirklich zu deinem Alltag, deiner Wohnsituation, deinem
-          Zeitbudget und deinen Erwartungen passt.
-        </p>
-        <p class="hero-note-text">
-          Jedes Tier hat einen eigenen Charakter, individuelle Bedürfnisse und
-          verdient ein Zuhause, in dem es langfristig glücklich sein kann.
-        </p>
-        <p class="hero-note-text">
-          Auf Grundlage deiner Antworten zeigen wir dir passende Tierprofile
-          aus Tierheimen, die aktuell auf ein neues Zuhause warten. Je
-          ehrlicher du antwortest, desto besser können wir Tiere finden, die
-          zu deinem Lebensstil passen – und denen du die besten
-          Voraussetzungen für ein glückliches Leben bieten kannst.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════
-       FAKTEN & ZAHLEN
-  ═══════════════════════════════════════ -->
-  <section class="fakten" id="fakten">
-    <div class="section-inner">
-      <span class="section-eyebrow">Zahlen & Fakten</span>
-      <h2 class="section-title">Die Realität in deutschen Tierheimen</h2>
-
-      <!-- Full-width appell box including source text -->
-      <div class="fakten-appell">
-        <h3 class="fakten-appell-title">Diese Zahlen haben einen Grund.</h3>
-        <p>
-          Tiere werden oft unüberlegt angeschafft und dann abgegeben, wenn der
-          Alltag die Realität einholt. <strong>Unser Quiz soll das verhindern</strong> —
-          durch ehrliche Fragen, die helfen, die richtige Entscheidung zu treffen.
-          Diese Zahlen stammen aus offiziellen Quellen des
-          <a href="https://www.tierschutzbund.de" target="_blank" rel="noopener" class="source-link">Deutschen Tierschutzbundes</a>.
-          Sie zeigen, warum eine durchdachte Tiervermittlung so wichtig ist.
-        </p>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">
-            <!-- Haus Icon -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 11.5 12 4l9 7.5"/>
-              <path d="M5 10v9.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/>
-              <path d="M9.5 20.5V14h5v6.5"/>
-            </svg>
-          </div>
-          <div class="stat-num">~550</div>
-          <div class="stat-label">Tierheime in Deutschland</div>
-          <p class="stat-desc">
-            Dem Deutschen Tierschutzbund sind über 740 Tierschutzvereine
-            mit rund 550 vereinseigenen Tierheimen angeschlossen.
+    /* ── Wunsch-Weg Banner ── */
+    if (wunschWegAktiv && wunschtierResult) {
+      html += `
+        <div class="wunsch-banner">
+          <h4>Dein Wunsch vs. Realität</h4>
+          <p>
+            Du hast dir einen ${tierartLabel[wunschtier]} gewünscht. Unser Quiz
+            empfiehlt dir eigentlich einen <strong>${tierartLabel[empfohleneTierart]}</strong>,
+            weil das besser zu deinem aktuellen Lebensstil passt.
+            Weiter unten zeigen wir dir aber auch, welcher ${tierartLabel[wunschtier]}
+            am besten zu dir passen würde — wenn du diesen Weg gehen möchtest.
           </p>
-          <a href="https://www.tierschutzbund.de/tiere-themen/heimtiere/tierheime/" target="_blank" rel="noopener" class="stat-source">Quelle: Tierschutzbund.de →</a>
-        </div>
+        </div>`;
+    }
 
-        <div class="stat-card">
-          <div class="stat-icon">
-            <!-- Warnzeichen Icon -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2 2 20h20L12 2Z"/>
-              <line x1="12" y1="9" x2="12" y2="14"/>
-              <line x1="12" y1="17" x2="12" y2="17.01"/>
-            </svg>
-          </div>
-          <div class="stat-num">100%</div>
-          <div class="stat-label">Tierheime sind voll</div>
-          <p class="stat-desc">
-            Dem Tierschutzbund ist aktuell kein einziges Tierheim in
-            Deutschland bekannt, das nicht voll oder sogar überfüllt ist.
-            Viele verhängen Aufnahmestopps.
+    /* ── Top 3 ── */
+    html += `<div class="top3-section">`;
+    html += `<h3 class="top3-title">Deine Top 3 Empfehlungen</h3>`;
+    html += `<div class="tier-cards">`;
+
+    if (top3.length === 0) {
+      html += `<p style="color:var(--text-light);font-size:.9rem;padding:16px 0;">
+        Leider wurden keine passenden Tiere in deiner Nähe gefunden.
+        Versuche die Umkreissuche zu erweitern oder besuche direkt ein Tierheim in deiner Nähe.
+      </p>`;
+    } else {
+      top3.forEach((tier, i) => {
+        const rank = i + 1;
+        html += renderTierCard(tier, rank);
+      });
+    }
+
+    html += `</div></div>`;
+
+    /* ── Wunsch-Weg Sektion ── */
+    if (wunschWegAktiv && wunschtierResult) {
+      html += `
+        <div class="wunschweg-section">
+          <h3 class="wunschweg-title">Dein Wunsch-Tier: ${tierartLabel[wunschtier]}</h3>
+          <p style="font-size:.92rem;color:var(--text-mid);margin-bottom:16px;line-height:1.6;">
+            Wenn du dich trotz der Empfehlung für einen
+            <strong>${tierartLabel[wunschtier]}</strong> entscheidest,
+            wäre das hier das am besten passende Tier:
           </p>
-          <a href="https://tiermedizin.thieme.de/aktuelles/vet-news/detail/deutschlands-tierheime-dramatisch-ueberfuellt-1076" target="_blank" rel="noopener" class="stat-source">Quelle: Thieme Tiermedizin →</a>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon">
-            <!-- Alarm/Glocke Icon -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
+          <div class="tier-cards">
+            ${renderTierCard(wunschtierResult, null)}
           </div>
-          <div class="stat-num">8.911</div>
-          <div class="stat-label">Tiere durch Animal Hoarding (2024)</div>
-          <p class="stat-desc">
-            147 Fälle von <abbr title="Animal Hoarding: krankhaftes Tiersammeln. Menschen häufen unkontrolliert immer mehr Tiere an, ohne sie angemessen versorgen zu können. Die Tiere leben oft auf engstem Raum, unterernährt und krank.">Animal Hoarding</abbr>
-            mit 8.911 betroffenen Tieren wurden 2024 erfasst — ein trauriger Rekord.
-            Die überfüllten Tierheime müssen diese Tiere zusätzlich aufnehmen.
-          </p>
-          <a href="https://www.tierschutzbund.de/ueber-uns/aktuelles/presse/meldung/tierschutzbund-veroeffentlicht-animal-hoarding-bericht-fuer-2024/" target="_blank" rel="noopener" class="stat-source">Quelle: Tierschutzbund.de →</a>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon">
-            <!-- Stopp-Schild Icon -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7.5 2h9L21 6.5v9L16.5 20h-9L3 15.5v-9L7.5 2Z"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-            </svg>
-          </div>
-          <div class="stat-num">Wochen</div>
-          <div class="stat-label">Wartezeit für Abgabe in München</div>
-          <p class="stat-desc">
-            Wer sein Tier in München abgeben möchte, wartet teilweise mehrere
-            Wochen oder Monate — so überfüllt sind die Kapazitäten.
-            Ein klares Zeichen: Jede Adoption muss wohlüberlegt sein.
-          </p>
-          <a href="https://tiermedizin.thieme.de/aktuelles/vet-news/detail/deutschlands-tierheime-dramatisch-ueberfuellt-1076" target="_blank" rel="noopener" class="stat-source">Quelle: Thieme Tiermedizin →</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════
-       QUIZ SECTION
-  ═══════════════════════════════════════ -->
-  <section class="quiz-section" id="quiz-section">
-    <div class="section-inner">
-      <span class="section-eyebrow">Das Quiz</span>
-      <h2 class="section-title">Welches Tier passt zu dir?</h2>
-      <p class="section-sub">
-        Beantworte alle Fragen so ehrlich wie möglich.
-        Am Ende findest du dein persönliches Tier-Match aus echten Tierheimen in deiner Nähe.
-      </p>
-
-      <!-- Progress Bar -->
-      <div class="quiz-progress-wrap" id="quizProgressWrap">
-        <div class="quiz-progress-info">
-          <span id="progressLabel">Frage 1 von 15</span>
-          <span id="progressPercent">0%</span>
-        </div>
-        <div class="quiz-progress-bar">
-          <div class="quiz-progress-fill" id="progressFill"></div>
-        </div>
-      </div>
-
-      <!-- Quiz Container -->
-      <div class="quiz-container" id="quizContainer">
-
-        <!-- F0: Standort -->
-        <div class="quiz-step active" data-step="0">
-          <div class="step-header">
-            <span class="step-tag">Einstieg</span>
-            <h3 class="step-title">Wo wohnst du?</h3>
-            <p class="step-desc">Damit wir Tierheime in deiner Nähe finden können (max. 2h Fahrt).</p>
-          </div>
-          <div class="input-group">
-            <label for="inputPlz">Deine Postleitzahl</label>
-            <input type="text" id="inputPlz" placeholder="z.B. 97070" maxlength="5" class="text-input" />
-            <span class="input-hint">Nur für die Entfernungsberechnung — wird nicht gespeichert.</span>
-          </div>
-          <div class="step-nav">
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F0b: Wunschtier -->
-        <div class="quiz-step" data-step="1">
-          <div class="step-header">
-            <span class="step-tag">Dein Wunsch</span>
-            <h3 class="step-title">Hast du schon ein Tier im Kopf?</h3>
-            <p class="step-desc">Das beeinflusst nicht das Ergebnis — aber wir zeigen dir am Ende auch einen "Wunsch-Weg" wenn dein Traumtier etwas anders ist als die Empfehlung.</p>
-          </div>
-          <div class="choice-grid" data-question="wunschtier">
-            <button class="choice-card" data-value="offen">Ich bin offen</button>
-            <button class="choice-card" data-value="hund">Hund</button>
-            <button class="choice-card" data-value="katze">Katze</button>
-            <button class="choice-card" data-value="kleintier">Kleintier</button>
-            <button class="choice-card" data-value="vogel">Vogel</button>
-            <button class="choice-card" data-value="fisch">Fisch</button>
-            <button class="choice-card" data-value="unsicher">Noch unsicher</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F1: Wohnsituation -->
-        <div class="quiz-step" data-step="2">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 1 · Wohnsituation</span>
-            <h3 class="step-title">Wie wohnst du aktuell?</h3>
-            <p class="step-desc">Der Platz, den du zur Verfügung hast, ist einer der wichtigsten Faktoren.</p>
-          </div>
-          <div class="choice-grid" data-question="wohnsituation">
-            <button class="choice-card" data-value="klein_ohne">Kleine Wohnung ohne Balkon</button>
-            <button class="choice-card" data-value="wohnung_balkon">Wohnung mit Balkon / Terrasse</button>
-            <button class="choice-card" data-value="haus_garten">Haus mit Garten</button>
-            <button class="choice-card" data-value="haus_grosser_garten">Haus mit großem Garten</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F2: Haushalt -->
-        <div class="quiz-step" data-step="3">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 1 · Wohnsituation</span>
-            <h3 class="step-title">Wer lebt noch in deinem Haushalt?</h3>
-            <p class="step-desc">Das soziale Umfeld beeinflusst, welche Tiere gut passen.</p>
-          </div>
-          <div class="choice-grid choice-grid--wide" data-question="haushalt">
-            <button class="choice-card" data-value="allein">Ich lebe allein</button>
-            <button class="choice-card" data-value="partner">Mit Partner/in</button>
-            <button class="choice-card" data-value="kinder_klein">Mit Kindern (unter 12)</button>
-            <button class="choice-card" data-value="kinder_gross">Mit Kindern (über 12)</button>
-            <button class="choice-card" data-value="wg">WG / Mitbewohner</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F3: Vorhandene Tiere -->
-        <div class="quiz-step" data-step="4">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 1 · Wohnsituation</span>
-            <h3 class="step-title">Gibt es bereits andere Haustiere bei dir?</h3>
-            <p class="step-desc">Die Verträglichkeit mit anderen Tieren ist wichtig.</p>
-          </div>
-          <div class="choice-grid choice-grid--wide" data-question="vorhandene_tiere">
-            <button class="choice-card" data-value="keine">Nein, keine</button>
-            <button class="choice-card" data-value="hund">Hund</button>
-            <button class="choice-card" data-value="katze">Katze</button>
-            <button class="choice-card" data-value="fische">Fische</button>
-            <button class="choice-card" data-value="hamster">Hamster</button>
-            <button class="choice-card" data-value="hase">Hase / Kaninchen</button>
-            <button class="choice-card" data-value="vogel">Vogel</button>
-            <button class="choice-card choice-card--dashed" data-value="sonstiges">Sonstiges</button>
-          </div>
-          <div class="sonstiges-input" id="sonstigesInput" style="display:none;">
-            <input type="text" id="sonstigesText" placeholder="z.B. Schlange, Ratte …" class="text-input" />
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F4: Stunden außer Haus -->
-        <div class="quiz-step" data-step="5">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 2 · Zeit & Alltag</span>
-            <h3 class="step-title">Wie viele Stunden bist du täglich außer Haus?</h3>
-            <p class="step-desc">Tiere reagieren sehr unterschiedlich auf Alleinsein.</p>
-          </div>
-          <div class="choice-grid" data-question="stunden_weg">
-            <button class="choice-card" data-value="unter4">Unter 4 Stunden</button>
-            <button class="choice-card" data-value="vier_acht">4–8 Stunden</button>
-            <button class="choice-card" data-value="ueber8">Über 8 Stunden</button>
-            <button class="choice-card" data-value="unregelmaessig">Sehr unregelmäßig</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F5: Aktive Zeit -->
-        <div class="quiz-step" data-step="6">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 2 · Zeit & Alltag</span>
-            <h3 class="step-title">Wie viel Zeit kannst du täglich aktiv mit einem Tier verbringen?</h3>
-            <p class="step-desc">Spielen, Gassi gehen, Beschäftigung — wie viel ist realistisch?</p>
-          </div>
-          <div class="choice-grid" data-question="aktive_zeit">
-            <button class="choice-card" data-value="unter30">Unter 30 Minuten</button>
-            <button class="choice-card" data-value="dreissig_sechzig">30–60 Minuten</button>
-            <button class="choice-card" data-value="ein_drei">1–3 Stunden</button>
-            <button class="choice-card" data-value="ueber3">Über 3 Stunden</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F6: Reisen -->
-        <div class="quiz-step" data-step="7">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 2 · Zeit & Alltag</span>
-            <h3 class="step-title">Wie oft verreist du im Jahr?</h3>
-            <p class="step-desc">Tiere brauchen auch in deiner Abwesenheit Betreuung.</p>
-          </div>
-          <div class="choice-grid" data-question="reisen">
-            <button class="choice-card" data-value="kaum">Kaum / nie</button>
-            <button class="choice-card" data-value="ein_zwei">1–2x kurz (unter 1 Woche)</button>
-            <button class="choice-card" data-value="mehrmals">Mehrmals im Jahr</button>
-            <button class="choice-card" data-value="sehr_oft">Sehr oft / langfristig</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F7: Aktivitätslevel -->
-        <div class="quiz-step" data-step="8">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 3 · Aktivität & Lebensstil</span>
-            <h3 class="step-title">Wie würdest du deinen Aktivitätslevel beschreiben?</h3>
-            <p class="step-desc">Das passende Tier sollte deiner eigenen Energie entsprechen.</p>
-          </div>
-          <div class="choice-grid" data-question="aktivitaet">
-            <button class="choice-card" data-value="ruhig">Eher ruhig / homebody</button>
-            <button class="choice-card" data-value="moderat">Moderat aktiv</button>
-            <button class="choice-card" data-value="aktiv">Sehr aktiv / Sport</button>
-            <button class="choice-card" data-value="outdoor">Outdoor-begeistert</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F8: Alltag mit Tier -->
-        <div class="quiz-step" data-step="9">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 3 · Aktivität & Lebensstil</span>
-            <h3 class="step-title">Was stellst du dir als Alltag mit deinem Tier vor?</h3>
-            <p class="step-desc">Deine Vision vom gemeinsamen Leben ist der wichtigste Anhaltspunkt.</p>
-          </div>
-          <div class="choice-grid" data-question="alltag">
-            <button class="choice-card" data-value="ruhig">Ruhige Gesellschaft</button>
-            <button class="choice-card" data-value="spiel">Spiel & Interaktion</button>
-            <button class="choice-card" data-value="draussen">Draußen-Abenteuer</button>
-            <button class="choice-card" data-value="training">Training & Aufgaben</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F9: Geräusche -->
-        <div class="quiz-step" data-step="10">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 3 · Aktivität & Lebensstil</span>
-            <h3 class="step-title">Wie empfindlich reagierst du auf Geräusche zu Hause?</h3>
-            <p class="step-desc">Hunde bellen, Vögel sind laut — das ist wichtig zu bedenken.</p>
-          </div>
-          <div class="choice-grid" data-question="geraeusche">
-            <button class="choice-card" data-value="kein_problem">Kein Problem, gerne lebhaft</button>
-            <button class="choice-card" data-value="etwas_ok">Etwas Lärm ist ok</button>
-            <button class="choice-card" data-value="viel_ruhe">Ich brauche viel Ruhe</button>
-            <button class="choice-card" data-value="nachbarn">Nachbarn könnten ein Problem sein</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F10: Erfahrung -->
-        <div class="quiz-step" data-step="11">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 4 · Erfahrung & Bereitschaft</span>
-            <h3 class="step-title">Hast du schon Erfahrung mit Haustieren?</h3>
-            <p class="step-desc">Manche Tiere brauchen erfahrenere Halter als andere.</p>
-          </div>
-          <div class="choice-grid" data-question="erfahrung">
-            <button class="choice-card" data-value="keine">Noch gar keine</button>
-            <button class="choice-card" data-value="kind">Als Kind gehabt</button>
-            <button class="choice-card" data-value="etwas">Einige Erfahrung</button>
-            <button class="choice-card" data-value="erfahren">Erfahrener Tierhalter</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F11: Kuscheln -->
-        <div class="quiz-step" data-step="12">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 4 · Erfahrung & Bereitschaft</span>
-            <h3 class="step-title">Wie wichtig ist dir körperlicher Kontakt / Kuscheln?</h3>
-            <p class="step-desc">Nicht alle Tiere mögen engen Körperkontakt.</p>
-          </div>
-          <div class="choice-grid" data-question="kuscheln">
-            <button class="choice-card" data-value="sehr_wichtig">Sehr wichtig</button>
-            <button class="choice-card" data-value="schoen">Schön, aber nicht nötig</button>
-            <button class="choice-card" data-value="unwichtig">Eher unwichtig</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
-        </div>
-
-        <!-- F12: Budget -->
-        <div class="quiz-step" data-step="13">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 4 · Erfahrung & Bereitschaft</span>
-            <h3 class="step-title">Wie groß ist dein monatliches Budget für ein Haustier?</h3>
-            <p class="step-desc">
-              Bitte sei ehrlich — Tiere kosten mehr als viele denken.
-              Neben monatlichen Kosten empfehlen wir eine
-              <strong>Notfallreserve von 500–2.000 €</strong> für unvorhergesehene Tierarztkosten.
+          <div class="wunschweg-appell">
+            <div class="wunschweg-appell-title">Ein Appell für das Tier</div>
+            <p>
+              Wenn du dich für einen ${tierartLabel[wunschtier]} entscheidest, obwohl dein
+              Lebensstil laut Quiz besser zu einem ${tierartLabel[empfohleneTierart]} passt,
+              bitte denk dabei an das Wohl des Tieres.
             </p>
+            <p>
+              Tiere sind keine Dekoration — sie haben Bedürfnisse, die täglich erfüllt
+              werden müssen. Sei bereit, deinen Alltag anzupassen, professionelle Hilfe
+              in Anspruch zu nehmen und das Tier immer an erste Stelle zu setzen.
+            </p>
+            <span class="highlight-line">Jede Adoption ist eine Verpflichtung — auf Lebenszeit.</span>
           </div>
-          <div class="budget-info">
-            <div class="budget-row">
-              <span>Hund</span><span class="budget-val">ca. 80–150 €/Monat</span>
-            </div>
-            <div class="budget-row">
-              <span>Katze</span><span class="budget-val">ca. 50–90 €/Monat</span>
-            </div>
-            <div class="budget-row">
-              <span>Kleintier</span><span class="budget-val">ca. 20–35 €/Monat</span>
-            </div>
-            <div class="budget-row">
-              <span>Vogel</span><span class="budget-val">ca. 35–60 €/Monat</span>
-            </div>
-            <div class="budget-row">
-              <span>Fische</span><span class="budget-val">ca. 15–25 €/Monat</span>
-            </div>
+        </div>`;
+    }
+
+    /* ── Modal befüllen & öffnen ── */
+    document.getElementById('modalContent').innerHTML = html;
+    openModal();
+  }
+
+  /* Rendert eine einzelne Tierkarte inkl. zugehörigem Kontaktblock.
+     rank: 1-3 für Top-3-Darstellung, oder null für den Wunsch-Weg (keine Nummerierung) */
+  function renderTierCard(tier, rank) {
+    const tags = tier.charakteristiken
+      ? tier.charakteristiken.split(',').map(t => t.trim()).slice(0, 4)
+      : [];
+    const story = tier.geschichte || '';
+    const rankClass = rank ? `rank-${rank}` : '';
+    const rankBadge = rank
+      ? `<div class="tier-rank">${rank}</div>`
+      : `<div class="tier-rank">★</div>`;
+
+    return `
+      <div class="tier-card ${rankClass}">
+        <div class="tier-card-body">
+          ${rankBadge}
+          <div class="tier-img-wrap">
+            <img class="tier-img" src="${tier.bild_url || ''}" alt="${tier.name}"
+                 onerror="this.src='https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=300&q=60'">
           </div>
-          <div class="choice-grid" data-question="budget">
-            <button class="choice-card" data-value="unter50">Unter 50 €</button>
-            <button class="choice-card" data-value="fuenfzig_150">50–150 €</button>
-            <button class="choice-card" data-value="ein50_300">150–300 €</button>
-            <button class="choice-card" data-value="kein_limit">Kein festes Limit</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
+          <div class="tier-info">
+            <div class="tier-name">${tier.name}</div>
+            <div class="tier-rasse">${tier.rasse} · ${tier.alter_text || ''} · ${tier.tierheim_seit} im Heim</div>
+            <div class="tier-tags">
+              ${tags.map(t => `<span class="tier-tag">${t}</span>`).join('')}
+            </div>
+            <p class="tier-story">${story}</p>
           </div>
         </div>
+        ${renderKontakt(tier)}
+      </div>`;
+  }
 
-        <!-- F13: Charaktereigenschaft -->
-        <div class="quiz-step" data-step="14">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 5 · Persönlichkeit</span>
-            <h3 class="step-title">Welche Eigenschaft ist dir bei einem Tier am wichtigsten?</h3>
-            <p class="step-desc">Dein persönliches Herz-Kriterium.</p>
-          </div>
-          <div class="choice-grid" data-question="charakter">
-            <button class="choice-card" data-value="treue">Treue / starke Bindung</button>
-            <button class="choice-card" data-value="selbststaendig">Selbstständigkeit</button>
-            <button class="choice-card" data-value="verspielt">Verspieltheit</button>
-            <button class="choice-card" data-value="ruhe">Ruhe & Sanftheit</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-next" onclick="App.nextStep()">Weiter →</button>
-          </div>
+  function renderKontakt(tier) {
+    const distBadge = tier.distanzKm
+      ? `<span class="distance-badge">${tier.distanzKm} km entfernt</span>`
+      : '';
+    return `
+      <div class="tier-contact">
+        <span class="contact-name">${tier.tierheim_name || ''} · ${tier.tierheim_stadt || ''}</span>
+        ${distBadge}
+        <div class="contact-links">
+          ${tier.tierheim_telefon ? `<a href="tel:${tier.tierheim_telefon}" class="contact-btn">${tier.tierheim_telefon}</a>` : ''}
+          ${tier.tierheim_email   ? `<a href="mailto:${tier.tierheim_email}" class="contact-btn">${tier.tierheim_email}</a>` : ''}
+          ${tier.tierheim_maps_url ? `<a href="${tier.tierheim_maps_url}" target="_blank" rel="noopener" class="contact-btn">Karte öffnen</a>` : ''}
         </div>
+      </div>`;
+  }
 
-        <!-- F14: Allergie -->
-        <div class="quiz-step" data-step="15">
-          <div class="step-header">
-            <span class="step-tag">Kategorie 5 · Persönlichkeit</span>
-            <h3 class="step-title">Hast du Allergien oder Empfindlichkeiten gegenüber Tierhaaren?</h3>
-            <p class="step-desc">Das ist gesundheitsrelevant und beeinflusst die Empfehlung direkt.</p>
-          </div>
-          <div class="choice-grid" data-question="allergie">
-            <button class="choice-card" data-value="nein">Nein</button>
-            <button class="choice-card" data-value="leicht">Leichte Allergie</button>
-            <button class="choice-card" data-value="stark">Starke Allergie</button>
-            <button class="choice-card" data-value="unsicher">Bin unsicher</button>
-          </div>
-          <div class="step-nav">
-            <button class="btn-back" onclick="App.prevStep()">← Zurück</button>
-            <button class="btn-submit" onclick="App.submitQuiz()">
-              Mein Match finden
-            </button>
-          </div>
-        </div>
+  function zeigeError() {
+    document.getElementById('modalContent').innerHTML = `
+      <div class="error-box">
+        <p>Es ist ein Fehler aufgetreten. Bitte versuche es erneut.</p>
+        <button onclick="App.closeModal(); location.reload();">Neu laden</button>
+      </div>`;
+    openModal();
+  }
 
-        <!-- Loading State -->
-        <div class="quiz-step quiz-loading" data-step="loading" style="display:none;">
-          <div class="loading-inner">
-            <div class="loading-paw">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <ellipse cx="12" cy="16" rx="5.5" ry="4.5"/>
-                <ellipse cx="6" cy="9" rx="2" ry="2.6"/>
-                <ellipse cx="10.5" cy="6" rx="2" ry="2.6"/>
-                <ellipse cx="15.5" cy="6" rx="2" ry="2.6"/>
-                <ellipse cx="18.5" cy="9" rx="2" ry="2.6"/>
-              </svg>
-            </div>
-            <h3>Wir suchen dein perfektes Tier…</h3>
-            <p>Wir gleichen deine Antworten mit unserer Datenbank ab und berechnen die Entfernung zu Tierheimen in deiner Nähe.</p>
-            <div class="loading-dots">
-              <span></span><span></span><span></span>
-            </div>
-          </div>
-        </div>
+  /* ─────────────────────────────────────────
+     MODAL
+  ───────────────────────────────────────── */
+  function openModal() {
+    const overlay = document.getElementById('resultModal');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    const inner = document.getElementById('modalInner');
+    if (inner) inner.scrollTop = 0;
+  }
 
-      </div><!-- /quiz-container -->
-    </div>
-  </section>
+  function closeModal() {
+    document.getElementById('resultModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
 
-  <!-- ═══════════════════════════════════════
-       ERGEBNIS MODAL
-  ═══════════════════════════════════════ -->
-  <div class="modal-overlay" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal" id="modalInner">
-      <button class="modal-close" onclick="App.closeModal()" aria-label="Schließen">✕</button>
+  /* ─────────────────────────────────────────
+     CHOICE CARDS – Event Delegation
+  ───────────────────────────────────────── */
+  function initChoiceCards() {
+    document.addEventListener('click', e => {
+      const card = e.target.closest('.choice-card');
+      if (!card) return;
+      const grid = card.closest('.choice-grid');
+      if (!grid) return;
 
-      <div class="modal-content" id="modalContent">
-        <!-- wird dynamisch befüllt -->
-      </div>
-    </div>
-  </div>
+      grid.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
 
-  <!-- ═══════════════════════════════════════
-       FOOTER
-  ═══════════════════════════════════════ -->
-  <footer class="footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <img src="assets/logo_negativ.png" alt="Tiermatcher – Finde dein perfektes Haustier" class="footer-logo-img" />
-      </div>
-      <div class="footer-links">
-        <p>Datenquellen</p>
-        <a href="https://www.tierschutzbund.de" target="_blank" rel="noopener">Deutscher Tierschutzbund</a>
-        <a href="https://tiermedizin.thieme.de" target="_blank" rel="noopener">Thieme Tiermedizin</a>
-      </div>
-      <div class="footer-note">
-        <p>
-          Alle Tierprofile sind fiktiv und dienen ausschließlich
-          Demonstrations­zwecken. Die dargestellten Tierheime,
-          Kontaktdaten und Tiere existieren in dieser Form nicht.
-        </p>
-      </div>
-    </div>
-  </footer>
+      const question = grid.dataset.question;
+      if (question === 'vorhandene_tiere') {
+        const sInput = document.getElementById('sonstigesInput');
+        if (sInput) {
+          sInput.style.display = card.dataset.value === 'sonstiges' ? 'block' : 'none';
+        }
+      }
 
-  <script src="app.js"></script>
-</body>
-</html>
+      answers[question] = card.dataset.value;
+    });
+  }
+
+  /* ─────────────────────────────────────────
+     NAVBAR – Scroll & Burger
+  ───────────────────────────────────────── */
+  function initNavbar() {
+    const navbar = document.getElementById('navbar');
+    const burger = document.getElementById('navBurger');
+    const menu   = document.getElementById('mobileMenu');
+    const links  = document.querySelectorAll('.nav-link');
+
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+
+      const sections = ['hero','fakten','quiz-section'];
+      let current = 'hero';
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && window.scrollY >= el.offsetTop - 100) current = id;
+      });
+      links.forEach(l => {
+        l.classList.toggle('active', l.getAttribute('href') === `#${current}`);
+      });
+    });
+
+    burger?.addEventListener('click', () => {
+      menu?.classList.toggle('open');
+    });
+
+    document.querySelectorAll('.mobile-link').forEach(l => {
+      l.addEventListener('click', () => menu?.classList.remove('open'));
+    });
+
+    document.getElementById('resultModal')?.addEventListener('click', e => {
+      if (e.target.id === 'resultModal') closeModal();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    document.getElementById('inputPlz')?.addEventListener('input', e => {
+      e.target.value = e.target.value.replace(/\D/g, '');
+    });
+  }
+
+  /* ─────────────────────────────────────────
+     INIT
+  ───────────────────────────────────────── */
+  function init() {
+    initChoiceCards();
+    initNavbar();
+    updateProgress();
+  }
+
+  /* ── Public API ── */
+  return { nextStep, prevStep, submitQuiz, closeModal, init };
+
+})();
+
+/* ── Start ── */
+document.addEventListener('DOMContentLoaded', App.init);
