@@ -597,4 +597,37 @@
   ═══════════════════════════════════════ -->
   <div class="modal-overlay" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal" id="modalInner">
-      <button class="modal-close" onclick="App.closeModal()" aria
+      <button class="modal-close" onclick="App.closeModal()" aria-label="Schließen">✕</button>
+
+      <div class="modal-content" id="modalContent">
+        <!-- wird dynamisch befüllt -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="assets/Logo.png" alt="Tiermatcher – Finde dein perfektes Haustier" class="footer-logo-img" />
+      </div>
+      <div class="footer-links">
+        <p>Datenquellen</p>
+        <a href="https://www.tierschutzbund.de" target="_blank" rel="noopener">Deutscher Tierschutzbund</a>
+        <a href="https://tiermedizin.thieme.de" target="_blank" rel="noopener">Thieme Tiermedizin</a>
+      </div>
+      <div class="footer-note">
+        <p>
+          Alle Tierprofile sind fiktiv und dienen ausschließlich
+          Demonstrations­zwecken. Die dargestellten Tierheime,
+          Kontaktdaten und Tiere existieren in dieser Form nicht.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
