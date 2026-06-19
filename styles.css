@@ -91,7 +91,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
   white-space: nowrap;
 }
 .nav-logo-img {
-  height: 56px;
+  height: 60px;
   width: auto;
   display: block;
 }
@@ -280,7 +280,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
   font-size: .92rem;
   color: var(--text-mid);
   line-height: 1.75;
+  margin-bottom: 18px;
 }
+.hero-note-text:last-child { margin-bottom: 0; }
 .hero-note-text strong { color: var(--text-dark); }
 
 /* ══════════════════════════════════
@@ -1046,9 +1048,6 @@ abbr[title] {
 .footer-logo-img {
   height: 52px;
   width: auto;
-  background: var(--bg);
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
 }
 .footer-tagline {
   font-size: .82rem;
