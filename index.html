@@ -17,7 +17,7 @@
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
       <a href="#hero" class="nav-logo">
-        <img src="assets/Logo.png" alt="Tiermatcher" class="nav-logo-img" />
+        <img src="assets/logo.png" alt="Tiermatcher – Finde dein perfektes Haustier" class="nav-logo-img" />
       </a>
       <ul class="nav-links">
         <li><a href="#hero" class="nav-link active">Startseite</a></li>
@@ -74,12 +74,35 @@
       </div>
 
       <div class="hero-note">
-        <h3 class="hero-note-title">Ehrlichkeit ist hier die größte Form von Fürsorge.</h3>
+        <h3 class="hero-note-title">Ehrlichkeit ist die größte Form von Fürsorge.</h3>
         <p class="hero-note-text">
-          Bitte fülle das Quiz so ehrlich und gewissenhaft wie möglich aus.
-          Es geht nicht nur darum, was du dir wünschst — sondern darum,
-          welches Tier wirklich zu deinem Lebensstil passt. Denn auch das
-          Tier hat ein Recht darauf, in ein Zuhause zu kommen, das zu ihm passt.
+          Bitte nimm dir einen Moment Zeit und beantworte die Fragen so ehrlich
+          und gewissenhaft wie möglich. Es geht bei diesem Quiz nicht darum,
+          das „perfekte" Haustier zu finden oder bestimmte Antworten zu geben.
+          Viel wichtiger ist, herauszufinden, welches Tier wirklich zu deinem
+          Alltag, deiner Wohnsituation, deinem Zeitbudget und deinen
+          Erwartungen passt.
+        </p>
+        <p class="hero-note-text">
+          Jedes Tier hat einen eigenen Charakter, individuelle Bedürfnisse und
+          verdient ein Zuhause, in dem es langfristig glücklich sein kann.
+          Eine erfolgreiche Adoption entsteht nicht dadurch, dass sich ein
+          Mensch ein bestimmtes Tier wünscht, sondern dadurch, dass Mensch
+          und Tier wirklich zueinander passen.
+        </p>
+        <p class="hero-note-text">
+          Deshalb berücksichtigen wir nicht nur deine Wünsche, sondern auch
+          die Bedürfnisse der Tiere. Auf Grundlage deiner Antworten zeigen
+          wir dir passende Tierprofile aus Tierheimen, die aktuell auf ein
+          neues Zuhause warten. Je ehrlicher du antwortest, desto besser
+          können wir Tiere finden, die zu deinem Lebensstil passen – und
+          denen du die besten Voraussetzungen für ein glückliches Leben
+          bieten kannst.
+        </p>
+        <p class="hero-note-text">
+          So schaffen wir die Grundlage für eine langfristige,
+          verantwortungsvolle und liebevolle Verbindung, von der beide
+          Seiten profitieren.
         </p>
       </div>
     </div>
@@ -93,22 +116,17 @@
       <span class="section-eyebrow">Zahlen & Fakten</span>
       <h2 class="section-title">Die Realität in deutschen Tierheimen</h2>
 
-      <!-- Top row: source text + appell box, aligned -->
-      <div class="fakten-top-row">
-        <p class="section-sub">
+      <!-- Full-width appell box including source text -->
+      <div class="fakten-appell">
+        <h3 class="fakten-appell-title">Diese Zahlen haben einen Grund.</h3>
+        <p>
+          Tiere werden oft unüberlegt angeschafft und dann abgegeben, wenn der
+          Alltag die Realität einholt. <strong>Unser Quiz soll das verhindern</strong> —
+          durch ehrliche Fragen, die helfen, die richtige Entscheidung zu treffen.
           Diese Zahlen stammen aus offiziellen Quellen des
           <a href="https://www.tierschutzbund.de" target="_blank" rel="noopener" class="source-link">Deutschen Tierschutzbundes</a>.
           Sie zeigen, warum eine durchdachte Tiervermittlung so wichtig ist.
         </p>
-
-        <div class="fakten-appell">
-          <h3 class="fakten-appell-title">Diese Zahlen haben einen Grund.</h3>
-          <p>
-            Tiere werden oft unüberlegt angeschafft und dann abgegeben, wenn der
-            Alltag die Realität einholt. <strong>Unser Quiz soll das verhindern</strong> —
-            durch ehrliche Fragen, die helfen, die richtige Entscheidung zu treffen.
-          </p>
-        </div>
       </div>
 
       <div class="stats-grid">
@@ -130,7 +148,7 @@
           <a href="https://www.tierschutzbund.de/tiere-themen/heimtiere/tierheime/" target="_blank" rel="noopener" class="stat-source">Quelle: Tierschutzbund.de →</a>
         </div>
 
-        <div class="stat-card stat-card--accent">
+        <div class="stat-card">
           <div class="stat-icon">
             <!-- Warnzeichen Icon -->
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -579,38 +597,4 @@
   ═══════════════════════════════════════ -->
   <div class="modal-overlay" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal" id="modalInner">
-      <button class="modal-close" onclick="App.closeModal()" aria-label="Schließen">✕</button>
-
-      <div class="modal-content" id="modalContent">
-        <!-- wird dynamisch befüllt -->
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════
-       FOOTER
-  ═══════════════════════════════════════ -->
-  <footer class="footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <img src="assets/Logo.png" alt="Tiermatcher" class="footer-logo-img" />
-        <p class="footer-tagline">Finde dein perfektes Haustier.</p>
-      </div>
-      <div class="footer-links">
-        <p>Datenquellen</p>
-        <a href="https://www.tierschutzbund.de" target="_blank" rel="noopener">Deutscher Tierschutzbund</a>
-        <a href="https://tiermedizin.thieme.de" target="_blank" rel="noopener">Thieme Tiermedizin</a>
-      </div>
-      <div class="footer-note">
-        <p>
-          Alle Tierprofile sind fiktiv und dienen ausschließlich
-          Demonstrations­zwecken. Die dargestellten Tierheime,
-          Kontaktdaten und Tiere existieren in dieser Form nicht.
-        </p>
-      </div>
-    </div>
-  </footer>
-
-  <script src="app.js"></script>
-</body>
-</html>
+      <button class="modal-close" onclick="App.closeModal()" aria
