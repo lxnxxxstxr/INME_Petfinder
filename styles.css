@@ -407,10 +407,14 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
 }
 .stat-source:hover { color: var(--green-light); }
 
-abbr[title] {
-  text-decoration: underline dotted var(--green-light);
-  cursor: help;
+.inline-link {
+  color: var(--green-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+  transition: color .2s;
 }
+.inline-link:hover { color: var(--white); }
 
 /* ══════════════════════════════════
    QUIZ SECTION
@@ -857,6 +861,7 @@ abbr[title] {
 
 .tier-card-body {
   display: flex;
+  align-items: center;
   gap: 20px;
 }
 
@@ -865,6 +870,7 @@ abbr[title] {
   align-items: center;
   justify-content: center;
   width: 48px;
+  align-self: stretch;
   flex-shrink: 0;
   background: var(--cream);
   font-family: var(--font-display);
