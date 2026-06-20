@@ -1,8 +1,8 @@
-Tiermatcher – Finde dein perfektes Haustier
+Tiermatcher – Finde dein perfektes Haustier:
 Eine interaktive Webseite zur verantwortungsvollen Tiervermittlung.
 Entwickelt als Studienprojekt mit HTML, CSS, JavaScript und Supabase.
 ---
-Projektbeschreibung
+Projektbeschreibung:
 Tiermatcher ist ein interaktives Quiz, das Nutzerinnen und Nutzern dabei hilft,
 das passende Haustier für ihren Lebensstil zu finden – und sie mit passenden
 Tierheim-Profilen in ihrer Nähe zu verbinden.
@@ -13,14 +13,14 @@ zum Wohl des Tieres.
 Live Demo
 Zur Webseite: https://DEIN-GITHUB-USERNAME.github.io/DEIN-REPOSITORY-NAME
 ---
-Technologien
+Technologien:
 Technologie	Verwendung
-HTML5	Struktur und Semantik
-CSS3	Design, Layout, Animationen
-JavaScript (Vanilla)	Quiz-Logik, API-Kommunikation
-Supabase	Datenbank mit fiktiven Tierprofilen
-Nominatim / OpenStreetMap	PLZ zu Koordinaten, kostenlos, ohne API-Key
-Google Fonts	Playfair Display und Inter
+HTML5:	Struktur und Semantik
+CSS3:	Design, Layout, Animationen
+JavaScript: (Vanilla)	Quiz-Logik, API-Kommunikation
+Supabase:	Datenbank mit fiktiven Tierprofilen
+Nominatim / OpenStreetMap:	PLZ zu Koordinaten, kostenlos, ohne API-Key
+Google Fonts:	Playfair Display und Inter
 ---
 Projektstruktur
 ```
@@ -35,17 +35,17 @@ tiermatcher/
 └── README.md                 Diese Datei
 ```
 ---
-Entstehungsgeschichte des Projekts
+Entstehungsgeschichte des Projekts:
 Das Projekt wurde Schritt für Schritt entwickelt. Die folgende Übersicht
 zeigt den chronologischen Ablauf der wichtigsten Entscheidungen.
-1. Konzeption des Quiz
+1. Konzeption des Quiz:
 Zunächst wurde der Fragenkatalog entwickelt: 15 Fragen in 5 Kategorien
 (Wohnsituation, Zeit und Alltag, Aktivität und Lebensstil, Erfahrung und
 Bereitschaft, Persönlichkeit), ergänzt um eine Eröffnungsfrage zur
 Postleitzahl und eine Frage zum Wunschtier. Jede Frage erhielt eine
 Gewichtung von 1 bis 5, je nachdem wie stark sie zwischen den Tierarten
 unterscheidet.
-2. Auswertungslogik
+2. Auswertungslogik:
 Auf Basis der Fragen wurde eine zweistufige Punktelogik entworfen:
 Stufe 1 ordnet jeder Antwort Punkte für die fünf Tierarten zu
 (Hund, Katze, Kleintier, Vogel, Fisch). Stufe 2 verfeinert das Ergebnis
@@ -53,7 +53,7 @@ anhand individueller Rasseneigenschaften aus der Datenbank. Ergänzt wurde
 ein "Wunsch-Weg": Wenn das gewünschte Tier von der Empfehlung abweicht,
 wird zusätzlich das am besten passende Tier der Wunsch-Tierart angezeigt,
 verbunden mit einem Appell zum Tierwohl.
-3. Aufbau der Datenbank
+3. Aufbau der Datenbank:
 Es wurden fiktive Tierprofile für alle fünf Tierarten erstellt, zunächst
 35 Profile (7 pro Tierart), später erweitert auf 95 Profile mit deutlich
 mehr Hunden und Katzen, da diese in der Realität die mit Abstand häufigsten
@@ -62,24 +62,24 @@ Deutschland verteilt (unter anderem München, Hamburg, Berlin, Köln,
 Stuttgart, Dresden, Leipzig sowie kleinere Städte wie Lohr am Main und
 Gemünden am Main), inklusive realistischer Adressen, Telefonnummern,
 E-Mail-Adressen und Geokoordinaten für die Entfernungsberechnung.
-4. Anbindung an Supabase
+4. Anbindung an Supabase:
 Die Tierprofile wurden in eine Supabase-Tabelle namens `tierprofile`
 importiert. Über Row Level Security wurde sichergestellt, dass die
 Datenbank von außen nur lesend zugänglich ist.
-5. Umsetzung als Webseite
+5. Umsetzung als Webseite:
 Die Inhalte wurden in eine Startseite mit Hero-Bereich, einer Fakten-Sektion
 mit Quellenangaben des Deutschen Tierschutzbundes, dem mehrstufigen Quiz
 und einem Ergebnis-Modal überführt. Die Datenbankanbindung erfolgt direkt
 im Frontend über die Supabase-API, die Entfernungsberechnung über die
 Nominatim-API und die Haversine-Formel.
-6. Designanpassungen
+6. Designanpassungen:
 Im letzten Schritt wurde das Corporate Design verfeinert: ein eigens
 erstelltes Logo wurde eingebunden, die Farbpalette und Typografie
 abgestimmt, Inhalte wie der Hinweistext zur Ehrlichkeit beim Ausfüllen
 des Quiz mehrfach überarbeitet, und kleinere Darstellungsfehler
 (zum Beispiel bei der Bildausrichtung in den Tierkarten) behoben.
 ---
-Das zweistufige Empfehlungssystem
+Das zweistufige Empfehlungssystem:
 Stufe 1: Tierartklassifikation
 Nach Abschluss des Quiz werden die Antworten lokal im JavaScript ausgewertet.
 Jede Antwort vergibt gewichtete Punkte auf ein Konto für Hund, Katze,
